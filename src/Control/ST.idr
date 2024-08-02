@@ -145,11 +145,11 @@ updateWith new       []        SubNil       = new
 updateWith new       []        (InRes el z) = absurd el
 
 -- Don't add the ones which were consumed by the subctxt
+updateWith new       (x :: xs) (Skip p)     = x :: updateWith new xs p
 updateWith []        (x :: xs) (InRes el p) =      updateWith [] (dropEl _ el) p
 
 -- A new item corresponding to an existing thing
 updateWith (n :: ns) (x :: xs) (InRes el p) = n :: updateWith ns (dropEl _ el) p
-updateWith new       (x :: xs) (Skip p)     = x :: updateWith new xs p
 
 public export
 getVarType : (xs : Resources) -> VarInRes v xs -> Type
@@ -158,14 +158,14 @@ getVarType (b            :: as) (VarThere x) = getVarType as x
 
 public export
 getCombineType : {xs : Resources} -> VarsIn ys xs -> List Type
-getCombineType VarsNil         = []
 getCombineType (InResVar el y) = getVarType _ el :: getCombineType y
+getCombineType VarsNil         = []
 getCombineType (SkipVar x)     = getCombineType x
 
 public export
 dropCombined : {res : Resources} -> VarsIn vs res -> Resources
-dropCombined {res = []}        VarsNil         = []
 dropCombined {res}             (InResVar el y) = dropCombined y
+dropCombined {res = []}        VarsNil         = []
 dropCombined {res = (y :: ys)} (SkipVar x)     = y :: dropCombined x
 
 public export
@@ -216,10 +216,7 @@ dropEntry (x :: env) (VarThere y) = x :: dropEntry env y
 
 dropVarsIn : Env res -> (prf : VarsIn vs res) -> Env (dropCombined prf)
 dropVarsIn []         VarsNil         = []
-dropVarsIn env        (InResVar el z)
-  -- TODO figure out why the function in the desired signature does not unfold
-  = believe_me
-  $ dropVarsIn (dropEntry env el) z
+dropVarsIn env        (InResVar el z) = dropVarsIn (dropEntry env el) z
 dropVarsIn (x :: env) (SkipVar z)     = x :: dropVarsIn env z
 
 getVarEntry : Env res -> (prf : VarInRes v res) -> getVarType res prf
@@ -228,10 +225,7 @@ getVarEntry (x :: env) (VarThere p) = getVarEntry env p
 
 mkComposite : Env res -> (prf : VarsIn vs res) -> Composite (getCombineType prf)
 mkComposite [] VarsNil = CompNil
-mkComposite env (InResVar el z)
-    -- TODO non-unfolding definition
-    = believe_me
-    $ CompCons (getVarEntry env el) (mkComposite (dropEntry env el) z)
+mkComposite env (InResVar el z) = CompCons (getVarEntry env el) (mkComposite (dropEntry env el) z)
 mkComposite (x :: env) (SkipVar z) = mkComposite env z
 
 rebuildVarsIn
@@ -298,8 +292,8 @@ addIfJust ty = Add (maybe [] (\var => [var ::: ty]))
 
 public export
 kept : {ys : Resources} -> SubRes xs ys -> Resources
-kept SubNil       = []
 kept (InRes el p) = kept p
+kept SubNil       = []
 kept (Skip {y} p) = y :: kept p
 
 -- We can only use new/delete/read/write on things wrapped in State. Only an
@@ -401,10 +395,7 @@ dropEnv (z :: zs) (Skip p)         = dropEnv zs p
 
 keepEnv : Env ys -> (prf : SubRes xs ys) -> Env (kept prf)
 keepEnv env       SubNil         = env
-keepEnv env       (InRes el prf)
-  -- TODO non-unfolding definition
-  = believe_me
-  $ keepEnv (dropDups env el) prf
+keepEnv env       (InRes el prf) = keepEnv (dropDups env el) prf
 keepEnv (z :: zs) (Skip prf)     = z :: keepEnv zs prf
 
 -- Corresponds pretty much exactly to 'updateWith'
@@ -417,10 +408,7 @@ rebuildEnv new       []        SubNil = new
 rebuildEnv new       []        (InRes el p) = absurd el
 rebuildEnv []        (x :: xs) (InRes el p) =      rebuildEnv [] (dropDups (x :: xs) el) p
 rebuildEnv (e :: es) (x :: xs) (InRes el p) = e :: rebuildEnv es (dropDups (x :: xs) el) p
-
--- TODO non-unfolding definition, but pattern matching on `new` solved the problem
-rebuildEnv new@[]       (x :: xs) (Skip p) = x :: rebuildEnv new xs p
-rebuildEnv new@(_ :: _) (x :: xs) (Skip p) = x :: rebuildEnv new xs p
+rebuildEnv new       (x :: xs) (Skip p)     = x :: rebuildEnv new xs p
 
 runST
    : Env invars

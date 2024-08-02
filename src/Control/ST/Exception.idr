@@ -1,11 +1,11 @@
 module Control.ST.Exception
 
 import Control.ST
-import Control.Catchable
-import Control.IOExcept
+--import Control.Catchable
+--import Control.IOExcept
 
 public export
-interface Exception (m : Type -> Type) errorType | m where
+interface Exception (0 m : Type -> Type) errorType | m where
   throw : errorType -> STrans m a ctxt (const ctxt)
 
   catch
@@ -31,6 +31,8 @@ implementation Exception Maybe () where
       Nothing => f ()
       Just ok => pure ok
 
+-- TODO Ignoring for now
+{-
 export
 implementation Exception (IOExcept errorType) errorType where
   throw err = lift (ioe_fail err)
@@ -38,3 +40,4 @@ implementation Exception (IOExcept errorType) errorType where
     io_res <- runAs prog
     res <- lift $ catch (do r <- io_res; pure (Right r)) (pure . Left)
     either (\err => f err) (\ok => pure ok) res
+-}

@@ -1,7 +1,8 @@
 module Control.ST.File
 
 import Control.ST
-import Control.IOExcept
+--import Control.IOExcept
+import System.File
 
 %default total
 
@@ -57,7 +58,7 @@ interface File (m : Type -> Type) where
   ||| @mode  the mode; either Read, WriteTruncate, Append, ReadWrite,
   |||        ReadWriteTruncate, or ReadAppend
   |||
-  open
+  open_
      : (fname : String)
     -> (mode  : Mode)
     -> ST m (Either FileError Var) [ addIfRight (FileHandleI mode) ]
@@ -90,6 +91,7 @@ interface File (m : Type -> Type) where
     -> {auto prf   : ValidModeRead mode}
     -> ST m (Either FileError Char) [ fileHandle ::: (FileHandleI mode) ]
 
+  -- TODO figure out if total is needed
   ||| Read the contents of a file into a string.
   |||
   ||| This checks the size of
@@ -99,6 +101,7 @@ interface File (m : Type -> Type) where
   |||
   ||| Returns an error if fname is not a normal file.
   |||
+  covering
   readFile
      : (fileName : String)
     -> ST m (Either FileError String) []
@@ -137,7 +140,8 @@ public export
 implementation File IO where
   FileHandleI mode = State (FileHandle mode)
 
-  open fname mode = do
+  -- TODO better name
+  open_ fname mode = do
       (Right file) <- lift ( openFile fname mode )
                    | (Left  error ) => pure (Left error)
       let fh = FH file
@@ -145,46 +149,53 @@ implementation File IO where
       pure (Right var)
 
   close fh = do
-      (FH file) <- read fh
-      lift (closeFile file)
-      delete fh
-      pure ()
+      -- TODO explicit proofs
+      (FH file) <- read {prf = Here} fh
+      -- TODO do notation not working, explicit proof
+      lift (closeFile file) >>= \_ => delete {prf = Here} fh >>= \_ => ST.pure ()
 
   eof fh = do
-      (FH file) <- read fh
+      -- TODO explicit proofs
+      (FH file) <- read {prf = Here} fh
       isEof <- lift (fEOF file)
       pure (isEof)
 
   flush fh = do
-      (FH file) <- read fh
-      lift (fEOF file)
-      pure ()
+      -- TODO explicit proof
+      (FH file) <- read {prf = Here} fh
+      -- TODO do notation not working
+      lift (fEOF file) >>= \_ => pure ()
 
   readLine fh = do
-      (FH file) <- read fh
+      -- TODO explicit proof
+      (FH file) <- read {prf = Here} fh
       (Right string) <- lift (fGetLine file)
                      | (Left  error ) => pure (Left error)
       pure (Right string)
 
   readChar fh = do
-      (FH file) <- read fh
-      (Right chr) <- lift (fgetc file)
+      -- TODO explicit proof
+      (FH file) <- read {prf = Here} fh
+      (Right chr) <- lift (fGetChar file)
                   | (Left  error ) => pure (Left error)
       pure (Right chr)
 
+  -- TODO not total, not whether totality is needed here
   readFile fname = do
       (Right content) <- lift ( readFile fname )
                       | (Left  error ) => pure (Left error)
       pure (Right content)
 
   writeString fh str = do
-      (FH file) <- read fh
+      -- TODO explicit proof
+      (FH file) <- read {prf = Here} fh
       Right x <- lift (fPutStr file str)
               | (Left  error ) => pure (Left error)
       pure (Right x)
 
   writeLine fh str = do
-      (FH file) <- read fh
+      -- TODO explicit proof
+      (FH file) <- read {prf = Here} fh
       Right x <- lift (fPutStrLn file str)
               | (Left  error ) => pure (Left error)
       pure (Right x)
@@ -194,6 +205,8 @@ implementation File IO where
               | (Left error ) => pure (Left error)
       pure (Right x)
 
+-- TODO Ignoring for now
+{-
 public export
 implementation File (IOExcept a) where
   FileHandleI mode = State (FileHandle mode)
@@ -254,3 +267,4 @@ implementation File (IOExcept a) where
       Right x <- lift (ioe_lift (writeFile fname str))
               | (Left error ) => pure (Left error)
       pure (Right x)
+-}

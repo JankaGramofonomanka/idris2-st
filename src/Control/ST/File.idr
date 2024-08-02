@@ -57,32 +57,38 @@ interface File (m : Type -> Type) where
   ||| @mode  the mode; either Read, WriteTruncate, Append, ReadWrite,
   |||        ReadWriteTruncate, or ReadAppend
   |||
-  open     :  (fname : String)
-           -> (mode  : Mode)
-           -> ST m (Either FileError Var) [ addIfRight (FileHandleI mode) ]
+  open
+     : (fname : String)
+    -> (mode  : Mode)
+    -> ST m (Either FileError Var) [ addIfRight (FileHandleI mode) ]
 
   ||| Close a file.
-  close    :  (fileHandle : Var)
-           -> ST m () [ remove fileHandle (FileHandleI mode)  ]
+  close
+     : (fileHandle : Var)
+    -> ST m () [ remove fileHandle (FileHandleI mode)  ]
 
   ||| Have we reached the end of the file.
-  eof      :  (fileHandle : Var)
-           -> {auto prf   : ValidModeRead mode}
-           -> ST m Bool [ fileHandle ::: (FileHandleI mode) ]
+  eof
+     : (fileHandle : Var)
+    -> {auto prf   : ValidModeRead mode}
+    -> ST m Bool [ fileHandle ::: (FileHandleI mode) ]
 
   ||| Flush
-  flush    :  (fileHandle : Var)
-           -> ST m () [ fileHandle ::: (FileHandleI mode) ]
+  flush
+     : (fileHandle : Var)
+    -> ST m () [ fileHandle ::: (FileHandleI mode) ]
 
   ||| Read a complete line.
-  readLine :  (fileHandle : Var)
-           -> {auto prf   : ValidModeRead mode}
-           -> ST m (Either FileError String) [ fileHandle ::: (FileHandleI mode) ]
+  readLine
+     : (fileHandle : Var)
+    -> {auto prf   : ValidModeRead mode}
+    -> ST m (Either FileError String) [ fileHandle ::: (FileHandleI mode) ]
 
   ||| Read a `Char`.
-  readChar :  (fileHandle : Var)
-           -> {auto prf   : ValidModeRead mode}
-           -> ST m (Either FileError Char) [ fileHandle ::: (FileHandleI mode) ]
+  readChar
+     : (fileHandle : Var)
+    -> {auto prf   : ValidModeRead mode}
+    -> ST m (Either FileError Char) [ fileHandle ::: (FileHandleI mode) ]
 
   ||| Read the contents of a file into a string.
   |||
@@ -93,38 +99,42 @@ interface File (m : Type -> Type) where
   |||
   ||| Returns an error if fname is not a normal file.
   |||
-  readFile :  (fileName : String)
-           -> ST m (Either FileError String) []
+  readFile
+     : (fileName : String)
+    -> ST m (Either FileError String) []
 
   ||| Write a complete line to the file.
   |||
   ||| @string The string to be written to file.
   |||
-  writeString : (fileHandle : Var)
-           -> (string     : String)
-           -> {auto prf   : ValidModeWrite mode}
-           -> ST m (Either FileError ()) [ fileHandle ::: (FileHandleI mode) ]
+  writeString
+     : (fileHandle : Var)
+    -> (string     : String)
+    -> {auto prf   : ValidModeWrite mode}
+    -> ST m (Either FileError ()) [ fileHandle ::: (FileHandleI mode) ]
 
   ||| Write a complete line to the file.
   |||
   ||| @string The text to be written to file.
   |||
-  writeLine : (fileHandle : Var)
-           -> (string     : String)
-           -> {auto prf   : ValidModeWrite mode}
-           -> ST m (Either FileError ()) [ fileHandle ::: (FileHandleI mode) ]
+  writeLine
+     : (fileHandle : Var)
+    -> (string     : String)
+    -> {auto prf   : ValidModeWrite mode}
+    -> ST m (Either FileError ()) [ fileHandle ::: (FileHandleI mode) ]
 
   ||| Create a file and write contents to the file.
   |||
   ||| @fname  The fileName of the file.
   ||| @string The text to be written to file.
   |||
-  writeFile : (fname  : String)
-           -> (string : String)
-           -> ST m (Either FileError ()) []
+  writeFile
+     : (fname  : String)
+    -> (string : String)
+    -> ST m (Either FileError ()) []
 
 public export
-File IO where
+implementation File IO where
   FileHandleI mode = State (FileHandle mode)
 
   open fname mode = do
@@ -185,7 +195,7 @@ File IO where
       pure (Right x)
 
 public export
-File (IOExcept a) where
+implementation File (IOExcept a) where
   FileHandleI mode = State (FileHandle mode)
 
   open fname mode = do
@@ -244,4 +254,3 @@ File (IOExcept a) where
       Right x <- lift (ioe_lift (writeFile fname str))
               | (Left error ) => pure (Left error)
       pure (Right x)
---- EOF -------------------------------------------------------------------------

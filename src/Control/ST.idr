@@ -1,7 +1,7 @@
 module Control.ST
 
-import Control.IOExcept
-import Language.Reflection.Utils
+--import Control.IOExcept
+import Language.Reflection.Util
 
 import public Data.Fuel
 
@@ -17,7 +17,7 @@ data Resource : Type where
 export
 data Var = MkVar -- Phantom, just for labelling purposes
 
-%error_reverse
+--%error_reverse
 public export
 (:::) : Var -> Type -> Resource
 (:::) = MkRes
@@ -65,7 +65,7 @@ data ElemRes : Resource -> Resources -> Type where
   HereRes  : ElemRes a (a :: as)
   ThereRes : ElemRes a as -> ElemRes a (b :: as)
 
-public export %error_reduce
+public export --%error_reduce
 dropEl : (ys : _) -> ElemRes x ys -> Resources
 dropEl (x :: as) HereRes      = as
 dropEl (x :: as) (ThereRes p) = x :: dropEl as p
@@ -76,7 +76,7 @@ data VarInRes : Var -> Resources -> Type where
   VarHere   : VarInRes a (MkRes a st :: as)
   VarThere  : VarInRes a as -> VarInRes a (b :: as)
 
-public export %error_reduce
+public export ----%error_reduce
 dropVarIn : (ys: _) -> VarInRes x ys -> Resources
 dropVarIn ((MkRes x _) :: as) VarHere      = as
 dropVarIn (x           :: as) (VarThere p) = x :: dropVarIn as p
@@ -93,7 +93,7 @@ namespace VarList
     (::) : Var -> VarList ts -> VarList (t :: ts)
 
   public export
-  mkRes : VarList tys -> Resources
+  mkRes : {tys : List Type} -> VarList tys -> Resources
   mkRes [] = []
   mkRes {tys = (t :: ts)} (v :: vs) = (v ::: t) :: mkRes vs
 
@@ -109,12 +109,12 @@ data SubRes : Resources -> Resources -> Type where
 
 %hint
 public export
-subResId : SubRes xs xs
+subResId : {xs : Resources} -> SubRes xs xs
 subResId {xs = []}        = SubNil
 subResId {xs = (x :: xs)} = InRes HereRes subResId
 
 public export
-subResNil : SubRes [] xs
+subResNil : {xs : Resources} -> SubRes [] xs
 subResNil {xs = []}        = SubNil
 subResNil {xs = (x :: xs)} = Skip subResNil
 
@@ -133,7 +133,7 @@ Uninhabited (ElemRes x []) where
   uninhabited HereRes      impossible
   uninhabited (ThereRes _) impossible
 
-public export %error_reduce
+public export --%error_reduce
 updateWith
    : (new : Resources)
   -> (xs  : Resources)
@@ -157,19 +157,19 @@ getVarType ((MkRes v st) :: as) VarHere      = st
 getVarType (b            :: as) (VarThere x) = getVarType as x
 
 public export
-getCombineType : VarsIn ys xs -> List Type
+getCombineType : {xs : Resources} -> VarsIn ys xs -> List Type
 getCombineType VarsNil         = []
 getCombineType (InResVar el y) = getVarType _ el :: getCombineType y
 getCombineType (SkipVar x)     = getCombineType x
 
 public export
-dropCombined : VarsIn vs res -> Resources
+dropCombined : {res : Resources} -> VarsIn vs res -> Resources
 dropCombined {res = []}        VarsNil         = []
 dropCombined {res}             (InResVar el y) = dropCombined y
 dropCombined {res = (y :: ys)} (SkipVar x)     = y :: dropCombined x
 
 public export
-combineVarsIn : (res : Resources) -> VarsIn (comp :: vs) res -> Resources
+combineVarsIn : {comp : Var} -> (res : Resources) -> VarsIn (comp :: vs) res -> Resources
 combineVarsIn {comp} res (InResVar el x)
   = ((comp ::: Composite (getCombineType x)) :: dropCombined (InResVar el x))
 
@@ -181,6 +181,7 @@ namespace Env
     Nil  : Env []
     (::) : ty -> Env xs -> Env ((lbl ::: ty) :: xs)
 
+  export
   (++) : Env xs -> Env ys -> Env (xs ++ ys)
   (++) [] ys = ys
   (++) (x :: xs) ys = x :: xs ++ ys
@@ -215,7 +216,10 @@ dropEntry (x :: env) (VarThere y) = x :: dropEntry env y
 
 dropVarsIn : Env res -> (prf : VarsIn vs res) -> Env (dropCombined prf)
 dropVarsIn []         VarsNil         = []
-dropVarsIn env        (InResVar el z) = dropVarsIn (dropEntry env el) z
+dropVarsIn env        (InResVar el z)
+  -- TODO figure out why the function in the desired signature does not unfold
+  = believe_me
+  $ dropVarsIn (dropEntry env el) z
 dropVarsIn (x :: env) (SkipVar z)     = x :: dropVarsIn env z
 
 getVarEntry : Env res -> (prf : VarInRes v res) -> getVarType res prf
@@ -225,8 +229,9 @@ getVarEntry (x :: env) (VarThere p) = getVarEntry env p
 mkComposite : Env res -> (prf : VarsIn vs res) -> Composite (getCombineType prf)
 mkComposite [] VarsNil = CompNil
 mkComposite env (InResVar el z)
-  = CompCons (getVarEntry env el) (mkComposite (dropEntry env el) z)
-
+    -- TODO non-unfolding definition
+    = believe_me
+    $ CompCons (getVarEntry env el) (mkComposite (dropEntry env el) z)
 mkComposite (x :: env) (SkipVar z) = mkComposite env z
 
 rebuildVarsIn
@@ -251,7 +256,7 @@ data
   Add    : (ty -> Resources) -> Action ty
 
 namespace Stable
-  public export %error_reduce
+  public export --%error_reduce
   (:::) : Var -> Type -> Action ty
   (:::) = Stable
 
@@ -259,7 +264,7 @@ namespace Trans
   public export
   data Trans ty = (:->) Type Type
 
-  public export %error_reduce
+  public export --%error_reduce
   (:::) : Var -> Trans ty -> Action ty
   (:::) lbl (st :-> st') = Trans lbl st (const st')
 
@@ -267,7 +272,7 @@ namespace DepTrans
   public export
   data DepTrans ty = (:->) Type (ty -> Type)
 
-  public export %error_reduce
+  public export --%error_reduce
   (:::) : Var -> DepTrans ty -> Action ty
   (:::) lbl (st :-> st') = Trans lbl st st'
 
@@ -275,24 +280,24 @@ public export
 or : a -> a -> Either b c -> a
 or x y = either (const x) (const y)
 
-public export %error_reduce
+public export --%error_reduce
 add : Type -> Action Var
 add ty = Add (\var => [var ::: ty])
 
-public export %error_reduce
+public export --%error_reduce
 remove : Var -> Type -> Action ty
 remove = Remove
 
-public export %error_reduce
+public export --%error_reduce
 addIfRight : Type -> Action (Either a Var)
 addIfRight ty = Add (either (const []) (\var => [var ::: ty]))
 
-public export %error_reduce
+public export --%error_reduce
 addIfJust : Type -> Action (Maybe Var)
 addIfJust ty = Add (maybe [] (\var => [var ::: ty]))
 
 public export
-kept : SubRes xs ys -> Resources
+kept : {ys : Resources} -> SubRes xs ys -> Resources
 kept SubNil       = []
 kept (InRes el p) = kept p
 kept (Skip {y} p) = y :: kept p
@@ -369,7 +374,7 @@ data STrans
     -> STrans m () res (const (updateRes res prf ty'))
 
 namespace Loop
-  export
+  public export
   data STransLoop
      : (m : Type -> Type)
     -> (ty : Type)
@@ -396,7 +401,10 @@ dropEnv (z :: zs) (Skip p)         = dropEnv zs p
 
 keepEnv : Env ys -> (prf : SubRes xs ys) -> Env (kept prf)
 keepEnv env       SubNil         = env
-keepEnv env       (InRes el prf) = keepEnv (dropDups env el) prf
+keepEnv env       (InRes el prf)
+  -- TODO non-unfolding definition
+  = believe_me
+  $ keepEnv (dropDups env el) prf
 keepEnv (z :: zs) (Skip prf)     = z :: keepEnv zs prf
 
 -- Corresponds pretty much exactly to 'updateWith'
@@ -409,7 +417,10 @@ rebuildEnv new       []        SubNil = new
 rebuildEnv new       []        (InRes el p) = absurd el
 rebuildEnv []        (x :: xs) (InRes el p) =      rebuildEnv [] (dropDups (x :: xs) el) p
 rebuildEnv (e :: es) (x :: xs) (InRes el p) = e :: rebuildEnv es (dropDups (x :: xs) el) p
-rebuildEnv new (x :: xs) (Skip p) = x :: rebuildEnv new xs p
+
+-- TODO non-unfolding definition, but pattern matching on `new` solved the problem
+rebuildEnv new@[]       (x :: xs) (Skip p) = x :: rebuildEnv new xs p
+rebuildEnv new@(_ :: _) (x :: xs) (Skip p) = x :: rebuildEnv new xs p
 
 runST
    : Env invars
@@ -481,9 +492,7 @@ returning
    : (result : ty)
   -> STrans m () res (const (out_fn result))
   -> STrans m ty res out_fn
-returning res prog = do
-  prog
-  pure res
+returning res prog = prog >>= (\_ => ST.pure res)
 
 export
 lift : Monad m => m t -> STrans m t res (const res)
@@ -577,13 +586,13 @@ namespace Loop
      :                       STrans     m a st1             st2_fn
     -> ((result : a) -> Inf (STransLoop m b (st2_fn result) st3_fn))
     ->                       STransLoop m b st1             st3_fn
-   (>>=) = Bind
+  (>>=) = Bind
 
-   export
-   pure : (result : ty) -> STransLoop m ty (out_fn result) out_fn
-   pure = Pure
+  export
+  pure : (result : ty) -> STransLoop m ty (out_fn result) out_fn
+  pure = Pure
 
-public export %error_reduce
+public export --%error_reduce
 out_res : ty -> (as : List (Action ty)) -> Resources
 out_res x []                          = []
 out_res x (Stable lbl inr      :: xs) = (lbl ::: inr) :: out_res x xs
@@ -591,7 +600,7 @@ out_res x (Trans  lbl inr outr :: xs) = (lbl ::: outr x) :: out_res x xs
 out_res x (Remove lbl inr      :: xs) = out_res x xs
 out_res x (Add outf            :: xs) = outf x ++ out_res x xs
 
-public export %error_reduce
+public export --%error_reduce
 in_res : (as : List (Action ty)) -> Resources
 in_res []                          = []
 in_res (Stable lbl inr      :: xs) = (lbl ::: inr) :: in_res xs
@@ -600,7 +609,7 @@ in_res (Remove lbl inr      :: xs) = (lbl ::: inr) :: in_res xs
 in_res (Add outf            :: xs) = in_res xs
 
 public export
-%error_reduce -- always evaluate this before showing errors
+--%error_reduce -- always evaluate this before showing errors
 ST
    : (m : Type -> Type)
   -> (ty : Type)
@@ -609,7 +618,7 @@ ST
 ST m ty xs = STrans m ty (in_res xs) (\result : ty => out_res result xs)
 
 public export
-%error_reduce -- always evaluate this before showing errors
+--%error_reduce -- always evaluate this before showing errors
 STLoop
    : (m : Type -> Type)
   -> (ty : Type)
@@ -619,7 +628,7 @@ STLoop m ty xs = STransLoop m ty (in_res xs) (\result : ty => out_res result xs)
 
 -- Console IO is useful sufficiently often that let's have it here
 public export
-interface ConsoleIO (m : Type -> Type) where
+interface ConsoleIO (0 m : Type -> Type) where
   putStr : String -> STrans m () xs (const xs)
   getStr : STrans m String xs (const xs)
 
@@ -640,12 +649,14 @@ printLn a = putStrLn $ show a
 
 export
 ConsoleIO IO where
-  putStr str = lift (Interactive.putStr str)
-  getStr     = lift Interactive.getLine
+  putStr str = lift (putStr str)
+  getStr     = lift getLine
 
-  putChar c  = lift (Interactive.putChar c)
-  getChar    = lift Interactive.getChar
+  putChar c  = lift (putChar c)
+  getChar    = lift getChar
 
+-- TODO Ignoring for now
+{-
 export
 ConsoleIO (IOExcept err) where
   putStr str = lift (ioe_lift (Interactive.putStr str))
@@ -653,6 +664,7 @@ ConsoleIO (IOExcept err) where
 
   putChar c  = lift (ioe_lift (Interactive.putChar c))
   getChar    = lift (ioe_lift Interactive.getChar)
+-}
 
 export
 run : Applicative m => ST m a [] -> m a
@@ -695,6 +707,8 @@ export
 runPure : ST Basics.id a [] -> a
 runPure prog = runST [] prog (\res, env' => res)
 
+-- TODO Ignoring for now
+{-
 %language ErrorReflection
 
 %error_handler
@@ -753,3 +767,4 @@ st_precondition (CantUnify _ tm1 tm2 _ _ _)
         ]
 
 st_precondition _ = Nothing
+-}

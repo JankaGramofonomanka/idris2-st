@@ -14,6 +14,7 @@ authors = "Jan Serwatka"
 
 -- packages to add to search path
 depends = elab-util
+        , contrib
 
 -- modules to install
 -- modules =
